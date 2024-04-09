@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net"
+
+	"github.com/codecrafters-io/dns-server-starter-go/pkg/parser"
 )
 
 func main() {
@@ -19,6 +21,7 @@ func main() {
 	}
 	defer udpConn.Close()
 
+	fmt.Println("Listening on Port 2053...")
 	buf := make([]byte, 512)
 
 	for {
@@ -30,10 +33,12 @@ func main() {
 
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
+		msg := parser.NewMessage(receivedData)
+		msg.AddDefaultHeader()
+		response := msg.GetHeader()
 
-		response := []byte{}
-
-		_, err = udpConn.WriteToUDP(response, source)
+		sentByteCount, err := udpConn.WriteToUDP(response, source)
+		fmt.Println("Byte Count:", sentByteCount)
 		if err != nil {
 			fmt.Println("Failed to send response:", err)
 		}
