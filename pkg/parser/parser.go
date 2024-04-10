@@ -1,8 +1,10 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -13,103 +15,111 @@ type Message struct {
 }
 
 type HeaderSection struct {
-	Header []byte
+	PacketId uint16 //16 bits A random ID assigned to query packets. Response packets must reply with the same ID
+	QR       uint8  //1 bit	1 for a reply packet, 0 for a question packet.
+	OpCode   uint8  //4 bits	Specifies the kind of query in a message.
+	AA       uint8  //1 bit	1 if the responding server "owns" the domain queried, i.e., it's authoritative.
+	TC       uint8  //1 if the message is larger than 512 bytes. Always 0 in UDP responses.
+	RD       uint8  //1 bit	Sender sets this to 1 if the server should recursively resolve this query, 0 otherwise.
+	RA       uint8  //Recursion Available 1 bit	Server sets this to 1 to indicate that recursion is available.
+	Z        uint8  //Reserved 3 bits	Used by DNSSEC queries. At inception, it was reserved for future use.
+	Rcode    uint8  //4 bits	Response code indicating the status of the response.
+	QdCount  uint16 //16 bits	Number of questions in the Question section.
+	AnCount  uint16 //16 bits	Number of records in the Answer section.
+	NsCount  uint16 //Authority Record Count 16 bits	Number of records in the Authority section.
+	ArCount  uint16 // Additional Record Count16 bits	Number of records in the Additional section.
 }
 
 func NewHeaderSection() HeaderSection {
-	return HeaderSection{
-		Header: make([]byte, 12),
-	}
+	return HeaderSection{}
 }
 
 func (h *HeaderSection) AddPID(pid uint16) *HeaderSection {
-	value := uint16(pid)
-	intBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(intBytes, value)
-	copy(h.Header[0:2], intBytes)
+	h.PacketId = pid
 	return h
 }
 
 func (h *HeaderSection) AddQR(flag uint8) *HeaderSection {
-	h.Header[2] |= flag << 7
+	h.QR = flag
 	return h
 }
 
 func (h *HeaderSection) AddOpCode(flag uint8) *HeaderSection {
-	h.Header[2] |= byte((flag & 0xF) << 3)
+	h.OpCode = flag
 	return h
 }
 
 func (h *HeaderSection) AddAA(flag uint8) *HeaderSection {
-	h.Header[2] |= (flag & 1) << 2
+	h.AA = flag
 	return h
 }
 
 func (h *HeaderSection) AddTC(flag uint8) *HeaderSection {
-	h.Header[2] |= (flag & 1) << 1
+	h.TC = flag
 	return h
 }
 
 func (h *HeaderSection) AddRD(flag uint8) *HeaderSection {
-	h.Header[2] |= (flag & 1)
+	h.RD = flag
 	return h
 }
 
 func (h *HeaderSection) AddRA(flag uint8) *HeaderSection {
-	h.Header[3] |= (flag & 1) << 7
+	h.RA = flag
 	return h
 }
 
 func (h *HeaderSection) AddZ(flag uint8) *HeaderSection {
-	h.Header[3] |= byte((flag & 0x3) << 4)
+	h.Z = flag
 	return h
 }
 
 func (h *HeaderSection) AddRcode(flag uint8) *HeaderSection {
-	h.Header[3] |= byte((flag & 0xF))
+	h.Rcode = flag
 	return h
 }
 
 func (h *HeaderSection) AddQdCount(flag uint16) *HeaderSection {
-	value := uint16(flag)
-	intBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(intBytes, value)
-	copy(h.Header[4:6], intBytes)
+	h.QdCount = flag
 	return h
 }
 
 func (h *HeaderSection) AddAnCount(flag uint16) *HeaderSection {
-	value := uint16(flag)
-	intBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(intBytes, value)
-	copy(h.Header[6:8], intBytes)
+	h.AnCount = flag
 	return h
 }
 
 func (h *HeaderSection) AddNsCount(flag uint16) *HeaderSection {
-	value := uint16(flag)
-	intBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(intBytes, value)
-	copy(h.Header[8:10], intBytes)
+	h.NsCount = flag
 	return h
 }
 
 func (h *HeaderSection) AddArCount(flag uint16) *HeaderSection {
-	value := uint16(flag)
-	intBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(intBytes, value)
-	copy(h.Header[10:12], intBytes)
+	h.ArCount = flag
 	return h
 }
 
-func (m *HeaderSection) GetHeader() []byte {
-	return m.Header
-}
+func (h *HeaderSection) ToBytes() []byte {
+	result := make([]byte, 12)
 
-func (m *HeaderSection) PrintHeader(header []byte) {
-	for _, b := range m.Header {
-		fmt.Println(b)
-	}
+	binary.BigEndian.PutUint16(result[0:2], h.PacketId)
+
+	result[2] |= h.QR << 7
+	result[2] |= byte((h.OpCode & 0xF) << 3)
+	result[2] |= (h.AA & 1) << 2
+	result[2] |= (h.TC & 1) << 1
+	result[2] |= (h.RD & 1)
+
+	result[3] |= (h.RA & 1) << 7
+	result[3] |= byte((h.Z & 0x3) << 4)
+	result[3] |= byte((h.Rcode & 0xF))
+
+	binary.BigEndian.PutUint16(result[4:6], h.QdCount)
+	binary.BigEndian.PutUint16(result[6:8], h.AnCount)
+	binary.BigEndian.PutUint16(result[8:10], h.NsCount)
+	binary.BigEndian.PutUint16(result[10:12], h.ArCount)
+
+	return result
 }
 
 type QuestionSection struct {
@@ -150,6 +160,14 @@ func (q *QuestionSection) AddClass(class uint16) *QuestionSection {
 func (q *QuestionSection) AddName(domain string) *QuestionSection {
 	q.Name = EncodeLabelSequence(domain)
 	return q
+}
+
+func (q *QuestionSection) ToBytes() []byte {
+	result := make([]byte, 0)
+	result = append(result, q.Name...)
+	result = append(result, q.Type...)
+	result = append(result, q.Class...)
+	return result
 }
 
 type AnswerSection struct {
@@ -202,8 +220,53 @@ func (a *AnswerSection) AddData(data string) *AnswerSection {
 	ipArray := strings.Split(data, ".")
 
 	for _, val := range ipArray {
-		ip = append(ip, []byte(val)...)
+		num, err := strconv.ParseUint(val, 10, 8)
+		if err != nil {
+			fmt.Println(err)
+		}
+		ip = append(ip, byte(num))
 	}
 	a.Data = ip
 	return a
+}
+
+func (a *AnswerSection) ToBytes() []byte {
+	result := make([]byte, 0)
+	result = append(result, a.Name...)
+	result = append(result, a.Type...)
+	result = append(result, a.Class...)
+	result = append(result, a.TTL...)
+	result = append(result, a.Length...)
+	result = append(result, a.Data...)
+
+	return result
+}
+
+func DeserializeHeader(header []byte) HeaderSection {
+	var packetId uint16
+	var qdCount uint16
+	var anCount uint16
+	var nsCount uint16
+	var arCount uint16
+	binary.Read(bytes.NewReader(header[:4]), binary.BigEndian, &packetId)
+	binary.Read(bytes.NewReader(header[4:6]), binary.BigEndian, &qdCount)
+	binary.Read(bytes.NewReader(header[6:8]), binary.BigEndian, &anCount)
+	binary.Read(bytes.NewReader(header[8:10]), binary.BigEndian, &nsCount)
+	binary.Read(bytes.NewReader(header[10:12]), binary.BigEndian, &arCount)
+
+	return HeaderSection{
+		PacketId: packetId,
+		QR:       (header[2] >> 7) & 1,
+		OpCode:   (header[2] >> 3) & 0x0F,
+		AA:       (header[2] >> 2) & 1,
+		TC:       (header[2] >> 1) & 1,
+		RD:       header[2] & 1,
+		RA:       (header[3] >> 7) & 1,
+		Z:        (header[3] >> 4) & 0x3,
+		Rcode:    header[3] & 0x0F,
+		QdCount:  qdCount,
+		AnCount:  anCount,
+		NsCount:  nsCount,
+		ArCount:  arCount,
+	}
 }

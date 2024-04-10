@@ -7,9 +7,25 @@ import (
 
 func TestHeader(t *testing.T) {
 	h := NewHeaderSection()
-	h.AddPID(1234).AddQR(1).AddOpCode(0).AddAA(0).AddTC(0).AddRD(0).AddRA(0).AddZ(0).AddRcode(0).AddQdCount(1).AddAnCount(1)
-	fmt.Println(h.Header)
+	h.AddPID(1234).AddQR(1).AddOpCode(1)
+	fmt.Println(h.ToBytes())
 }
+
+func TestDeserializeHeader(t *testing.T) {
+	h := NewHeaderSection()
+	h.AddPID(1234).AddQR(1).AddOpCode(1).AddRcode(4)
+
+	b := h.ToBytes()
+	ph := DeserializeHeader(b)
+	fmt.Println("Deserialized Packet Id - ", ph.PacketId)
+	fmt.Println("Deserialized QR - ", ph.QR)
+	fmt.Println("Deserialized Op code - ", ph.OpCode)
+	fmt.Println("Deserialized Rcode - ", ph.Rcode)
+}
+
+// 1 0 0 0
+/* 1 1 0 0 0 0 0 0 */
+/* 4 210 137 0 0 1 0 1 0 0 0 0 */
 
 func TestQuestion(t *testing.T) {
 	q := NewQuestionSection()

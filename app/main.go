@@ -7,6 +7,7 @@ import (
 	"github.com/codecrafters-io/dns-server-starter-go/pkg/parser"
 )
 
+// add better doc support for all the header fields - enums
 func main() {
 	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:2053")
 	if err != nil {
@@ -34,8 +35,10 @@ func main() {
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		h := parser.NewHeaderSection()
-		h.AddPID(1234).AddQR(1).AddQdCount(1).AddAnCount(1)
+		reqHeader := parser.DeserializeHeader(buf[:12])
+
+		// h := parser.NewHeaderSection()
+		// h.AddPID(reqHeader.PacketId).AddQR(1).AddQdCount(1).AddAnCount(1).AddRD(1).AddOpCode(8)
 
 		q := parser.NewQuestionSection()
 		q.AddName("codecrafters.io").AddType(1).AddClass(1)
@@ -43,25 +46,16 @@ func main() {
 		a := parser.NewAnswerSection()
 		a.AddName("codecrafters.io").AddType(1).AddClass(1).AddTTL(60).AddLength(4).AddData("8.8.8.8")
 
-		msg := parser.Message{}
-
-		msg.Header = append(msg.Header, h.Header...)
-
-		msg.Question = append(msg.Question, q.Name...)
-		msg.Question = append(msg.Question, q.Type...)
-		msg.Question = append(msg.Question, q.Class...)
-
-		msg.Answer = append(msg.Answer, a.Name...)
-		msg.Answer = append(msg.Answer, a.Type...)
-		msg.Answer = append(msg.Answer, a.Class...)
-		msg.Answer = append(msg.Answer, a.TTL...)
-		msg.Answer = append(msg.Answer, a.Length...)
-		msg.Answer = append(msg.Answer, a.Data...)
+		reqHeader.AddQR(1).AddAnCount(1).AddRcode(4)
+		fmt.Println("Request RCode", reqHeader.Rcode)
+		header := reqHeader.ToBytes()
+		question := q.ToBytes()
+		answer := a.ToBytes()
 
 		response := []byte{}
-		response = append(response, msg.Header...)
-		response = append(response, msg.Question...)
-		response = append(response, msg.Answer...)
+		response = append(response, header...)
+		response = append(response, question...)
+		response = append(response, answer...)
 
 		sentByteCount, err := udpConn.WriteToUDP(response, source)
 		fmt.Println("Byte Count:", sentByteCount)
