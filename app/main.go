@@ -35,21 +35,33 @@ func main() {
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
 		h := parser.NewHeaderSection()
-		h.AddPID(1234).AddQR(1).AddOpCode(0).AddAA(0).AddTC(0).AddRD(0).AddRA(0).AddZ(0).AddRcode(0).AddQdCount(1)
+		h.AddPID(1234).AddQR(1).AddQdCount(1).AddAnCount(1)
 
 		q := parser.NewQuestionSection()
 		q.AddName("codecrafters.io").AddType(1).AddClass(1)
 
+		a := parser.NewAnswerSection()
+		a.AddName("codecrafters.io").AddType(1).AddClass(1).AddTTL(60).AddLength(4).AddData("8.8.8.8")
+
 		msg := parser.Message{}
 
 		msg.Header = append(msg.Header, h.Header...)
+
 		msg.Question = append(msg.Question, q.Name...)
 		msg.Question = append(msg.Question, q.Type...)
 		msg.Question = append(msg.Question, q.Class...)
 
+		msg.Answer = append(msg.Answer, a.Name...)
+		msg.Answer = append(msg.Answer, a.Type...)
+		msg.Answer = append(msg.Answer, a.Class...)
+		msg.Answer = append(msg.Answer, a.TTL...)
+		msg.Answer = append(msg.Answer, a.Length...)
+		msg.Answer = append(msg.Answer, a.Data...)
+
 		response := []byte{}
 		response = append(response, msg.Header...)
 		response = append(response, msg.Question...)
+		response = append(response, msg.Answer...)
 
 		sentByteCount, err := udpConn.WriteToUDP(response, source)
 		fmt.Println("Byte Count:", sentByteCount)

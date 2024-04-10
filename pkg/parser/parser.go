@@ -9,6 +9,7 @@ import (
 type Message struct {
 	Header   []byte
 	Question []byte
+	Answer   []byte
 }
 
 type HeaderSection struct {
@@ -112,12 +113,9 @@ func (m *HeaderSection) PrintHeader(header []byte) {
 }
 
 type QuestionSection struct {
-	/* A domain name, represented as a sequence of "labels" (more on this below) */
-	Name []byte
-	/* 2-byte int; the type of record (1 for an A record, 5 for a CNAME record etc., full list here) */
-	Type []byte
-	/* 2-byte int; usually set to 1 (full list here) */
-	Class []byte
+	Name  []byte // A domain name, represented as a sequence of "labels" (more on this below)
+	Type  []byte // 2-byte int; the type of record (1 for an A record, 5 for a CNAME record etc., full list here)
+	Class []byte // 2-byte int; usually set to 1 (full list here)
 }
 
 func NewQuestionSection() QuestionSection {
@@ -128,7 +126,7 @@ func NewQuestionSection() QuestionSection {
 	}
 }
 
-func EncodeName(domain string) []byte {
+func EncodeLabelSequence(domain string) []byte {
 	name := make([]byte, 0)
 	domainArray := strings.Split(domain, ".")
 	for _, d := range domainArray {
@@ -144,12 +142,68 @@ func (q *QuestionSection) AddType(typ uint16) *QuestionSection {
 	return q
 }
 
-func (q *QuestionSection) AddClass(typ uint16) *QuestionSection {
-	binary.BigEndian.PutUint16(q.Class, typ)
+func (q *QuestionSection) AddClass(class uint16) *QuestionSection {
+	binary.BigEndian.PutUint16(q.Class, class)
 	return q
 }
 
 func (q *QuestionSection) AddName(domain string) *QuestionSection {
-	q.Name = EncodeName(domain)
+	q.Name = EncodeLabelSequence(domain)
 	return q
+}
+
+type AnswerSection struct {
+	Name   []byte // Label Sequence	The domain name encoded as a sequence of labels.
+	Type   []byte // 2-byte Integer	1 for an A record, 5 for a CNAME record etc., full list here
+	Class  []byte // 2-byte Integer	Usually set to 1 (full list here)
+	TTL    []byte // 4-byte Integer	The duration in seconds a record can be cached before requerying.
+	Length []byte // 2-byte Integer	Length of the RDATA field in bytes.
+	Data   []byte // Variable	Data specific to the record type.
+}
+
+func NewAnswerSection() AnswerSection {
+	return AnswerSection{
+		Name:   make([]byte, 0),
+		Type:   make([]byte, 2),
+		Class:  make([]byte, 2),
+		TTL:    make([]byte, 4),
+		Length: make([]byte, 2),
+		Data:   make([]byte, 0),
+	}
+}
+
+func (a *AnswerSection) AddName(domain string) *AnswerSection {
+	a.Name = EncodeLabelSequence(domain)
+	return a
+}
+
+func (a *AnswerSection) AddType(typ uint16) *AnswerSection {
+	binary.BigEndian.PutUint16(a.Type, typ)
+	return a
+}
+
+func (a *AnswerSection) AddClass(class uint16) *AnswerSection {
+	binary.BigEndian.PutUint16(a.Class, class)
+	return a
+}
+
+func (a *AnswerSection) AddTTL(ttl uint32) *AnswerSection {
+	binary.BigEndian.PutUint32(a.TTL, ttl)
+	return a
+}
+
+func (a *AnswerSection) AddLength(length uint16) *AnswerSection {
+	binary.BigEndian.PutUint16(a.Length, length)
+	return a
+}
+
+func (a *AnswerSection) AddData(data string) *AnswerSection {
+	ip := make([]byte, 0)
+	ipArray := strings.Split(data, ".")
+
+	for _, val := range ipArray {
+		ip = append(ip, []byte(val)...)
+	}
+	a.Data = ip
+	return a
 }
