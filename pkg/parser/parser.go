@@ -11,97 +11,101 @@ type Message struct {
 	Question []byte
 }
 
-func NewMessage(data string) Message {
-	return Message{
+type HeaderSection struct {
+	Header []byte
+}
+
+func NewHeaderSection() HeaderSection {
+	return HeaderSection{
 		Header: make([]byte, 12),
 	}
 }
 
-func (m *Message) AddPID(pid uint16) *Message {
+func (h *HeaderSection) AddPID(pid uint16) *HeaderSection {
 	value := uint16(pid)
 	intBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(intBytes, value)
-	copy(m.Header[0:2], intBytes)
-	return m
+	copy(h.Header[0:2], intBytes)
+	return h
 }
 
-func (m *Message) AddQR(flag uint8) *Message {
-	m.Header[2] |= flag << 7
-	return m
+func (h *HeaderSection) AddQR(flag uint8) *HeaderSection {
+	h.Header[2] |= flag << 7
+	return h
 }
 
-func (m *Message) AddOpCode(flag uint8) *Message {
-	m.Header[2] |= byte((flag & 0xF) << 3)
-	return m
+func (h *HeaderSection) AddOpCode(flag uint8) *HeaderSection {
+	h.Header[2] |= byte((flag & 0xF) << 3)
+	return h
 }
 
-func (m *Message) AddAA(flag uint8) *Message {
-	m.Header[2] |= (flag & 1) << 2
-	return m
+func (h *HeaderSection) AddAA(flag uint8) *HeaderSection {
+	h.Header[2] |= (flag & 1) << 2
+	return h
 }
 
-func (m *Message) AddTC(flag uint8) *Message {
-	m.Header[2] |= (flag & 1) << 1
-	return m
+func (h *HeaderSection) AddTC(flag uint8) *HeaderSection {
+	h.Header[2] |= (flag & 1) << 1
+	return h
 }
 
-func (m *Message) AddRD(flag uint8) *Message {
-	m.Header[2] |= (flag & 1)
-	return m
+func (h *HeaderSection) AddRD(flag uint8) *HeaderSection {
+	h.Header[2] |= (flag & 1)
+	return h
 }
 
-func (m *Message) AddRA(flag uint8) *Message {
-	m.Header[3] |= (flag & 1) << 7
-	return m
+func (h *HeaderSection) AddRA(flag uint8) *HeaderSection {
+	h.Header[3] |= (flag & 1) << 7
+	return h
 }
 
-func (m *Message) AddZ(flag uint8) *Message {
-	m.Header[3] |= byte((flag & 0x3) << 4)
-	return m
+func (h *HeaderSection) AddZ(flag uint8) *HeaderSection {
+	h.Header[3] |= byte((flag & 0x3) << 4)
+	return h
 }
 
-func (m *Message) AddRcode(flag uint8) *Message {
-	m.Header[3] |= byte((flag & 0xF))
-	return m
+func (h *HeaderSection) AddRcode(flag uint8) *HeaderSection {
+	h.Header[3] |= byte((flag & 0xF))
+	return h
 }
 
-func (m *Message) AddQdCount(flag uint16) *Message {
+func (h *HeaderSection) AddQdCount(flag uint16) *HeaderSection {
 	value := uint16(flag)
 	intBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(intBytes, value)
-	copy(m.Header[4:6], intBytes)
-	return m
+	copy(h.Header[4:6], intBytes)
+	return h
 }
 
-func (m *Message) AddAnCount(flag uint16) *Message {
+func (h *HeaderSection) AddAnCount(flag uint16) *HeaderSection {
 	value := uint16(flag)
 	intBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(intBytes, value)
-	copy(m.Header[6:8], intBytes)
-	return m
+	copy(h.Header[6:8], intBytes)
+	return h
 }
 
-func (m *Message) AddNsCount(flag uint16) *Message {
+func (h *HeaderSection) AddNsCount(flag uint16) *HeaderSection {
 	value := uint16(flag)
 	intBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(intBytes, value)
-	copy(m.Header[8:10], intBytes)
-	return m
+	copy(h.Header[8:10], intBytes)
+	return h
 }
 
-func (m *Message) AddArCount(flag uint16) *Message {
+func (h *HeaderSection) AddArCount(flag uint16) *HeaderSection {
 	value := uint16(flag)
 	intBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(intBytes, value)
-	copy(m.Header[10:12], intBytes)
-	return m
+	copy(h.Header[10:12], intBytes)
+	return h
 }
 
-func (m *Message) GetHeader() []byte {
+func (m *HeaderSection) GetHeader() []byte {
 	return m.Header
 }
 
-func (m *Message) PrintHeader(header []byte) {
+func (m *HeaderSection) PrintHeader(header []byte) {
 	for _, b := range m.Header {
 		fmt.Println(b)
 	}

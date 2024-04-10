@@ -6,10 +6,10 @@ import (
 )
 
 func TestHeader(t *testing.T) {
-	m := NewMessage("test")
+	m := NewHeaderSection()
 	var result byte
-	fmt.Println(result)
 	m.AddPID(1234).AddQR(1).AddOpCode(0).AddAA(0).AddTC(0).AddRD(0).AddRA(0).AddZ(0).AddRcode(0)
+	fmt.Println(result)
 }
 
 func TestQuestion(t *testing.T) {
