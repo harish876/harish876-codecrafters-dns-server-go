@@ -3,10 +3,12 @@ package parser
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 type Message struct {
-	Header []byte
+	Header   []byte
+	Question []byte
 }
 
 func NewMessage(data string) Message {
@@ -103,4 +105,47 @@ func (m *Message) PrintHeader(header []byte) {
 	for _, b := range m.Header {
 		fmt.Println(b)
 	}
+}
+
+type QuestionSection struct {
+	/* A domain name, represented as a sequence of "labels" (more on this below) */
+	Name []byte
+	/* 2-byte int; the type of record (1 for an A record, 5 for a CNAME record etc., full list here) */
+	Type []byte
+	/* 2-byte int; usually set to 1 (full list here) */
+	Class []byte
+}
+
+func NewQuestionSection() QuestionSection {
+	return QuestionSection{
+		Name:  make([]byte, 0),
+		Type:  make([]byte, 2),
+		Class: make([]byte, 2),
+	}
+}
+
+func EncodeName(domain string) []byte {
+	name := make([]byte, 0)
+	domainArray := strings.Split(domain, ".")
+	for _, d := range domainArray {
+		name = append(name, byte(len(d)))
+		name = append(name, []byte(d)...)
+	}
+	name = append(name, 0x00)
+	return name
+}
+
+func (q *QuestionSection) AddType(typ uint16) *QuestionSection {
+	binary.BigEndian.PutUint16(q.Type, typ)
+	return q
+}
+
+func (q *QuestionSection) AddClass(typ uint16) *QuestionSection {
+	binary.BigEndian.PutUint16(q.Class, typ)
+	return q
+}
+
+func (q *QuestionSection) AddName(domain string) *QuestionSection {
+	q.Name = EncodeName(domain)
+	return q
 }

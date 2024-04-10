@@ -34,8 +34,17 @@ func main() {
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 		msg := parser.NewMessage(receivedData)
-		msg.AddPID(1234).AddQR(1).AddOpCode(0).AddAA(0).AddTC(0).AddRD(0).AddRA(0).AddZ(0).AddRcode(0)
-		response := msg.GetHeader()
+		msg.AddPID(1234).AddQR(1).AddOpCode(0).AddAA(0).AddTC(0).AddRD(0).AddRA(0).AddZ(0).AddRcode(0).AddQdCount(1)
+		q := parser.NewQuestionSection()
+		q.AddName("codecrafters.io").AddType(1).AddClass(1)
+
+		msg.Question = append(msg.Question, q.Name...)
+		msg.Question = append(msg.Question, q.Type...)
+		msg.Question = append(msg.Question, q.Class...)
+
+		response := []byte{}
+		response = append(response, msg.Header...)
+		response = append(response, msg.Question...)
 
 		sentByteCount, err := udpConn.WriteToUDP(response, source)
 		fmt.Println("Byte Count:", sentByteCount)
