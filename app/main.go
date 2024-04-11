@@ -35,16 +35,14 @@ func main() {
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		reqHeader := parser.DeserializeHeader(buf[:12])
-
-		// h := parser.NewHeaderSection()
-		// h.AddPID(reqHeader.PacketId).AddQR(1).AddQdCount(1).AddAnCount(1).AddRD(1).AddOpCode(8)
+		reqHeader, offset1 := parser.DeserializeHeader(buf[:12])
+		reqQuestion, _ := parser.DeserializeQuestionSection(buf[offset1:])
 
 		q := parser.NewQuestionSection()
-		q.AddName("codecrafters.io").AddType(1).AddClass(1)
+		q.AddName(string(reqQuestion.Name)).AddType(1).AddClass(1)
 
 		a := parser.NewAnswerSection()
-		a.AddName("codecrafters.io").AddType(1).AddClass(1).AddTTL(60).AddLength(4).AddData("8.8.8.8")
+		a.AddName(string(reqQuestion.Name)).AddType(1).AddClass(1).AddTTL(60).AddLength(4).AddData("8.8.8.8")
 
 		reqHeader.AddQR(1).AddAnCount(1).AddRcode(4)
 		fmt.Println("Request RCode", reqHeader.Rcode)

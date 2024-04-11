@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+var (
+	TYPE_A     = 1
+	CLASS_IN   = 1
+	HEADER_LEN = 12
+)
+
 type Message struct {
 	Header   []byte
 	Question []byte
@@ -124,15 +130,13 @@ func (h *HeaderSection) ToBytes() []byte {
 
 type QuestionSection struct {
 	Name  []byte // A domain name, represented as a sequence of "labels" (more on this below)
-	Type  []byte // 2-byte int; the type of record (1 for an A record, 5 for a CNAME record etc., full list here)
-	Class []byte // 2-byte int; usually set to 1 (full list here)
+	Type  uint16 // 2-byte int; the type of record (1 for an A record, 5 for a CNAME record etc., full list here)
+	Class uint16 // 2-byte int; usually set to 1 (full list here)
 }
 
 func NewQuestionSection() QuestionSection {
 	return QuestionSection{
-		Name:  make([]byte, 0),
-		Type:  make([]byte, 2),
-		Class: make([]byte, 2),
+		Name: make([]byte, 0),
 	}
 }
 
@@ -148,12 +152,12 @@ func EncodeLabelSequence(domain string) []byte {
 }
 
 func (q *QuestionSection) AddType(typ uint16) *QuestionSection {
-	binary.BigEndian.PutUint16(q.Type, typ)
+	q.Type = typ
 	return q
 }
 
 func (q *QuestionSection) AddClass(class uint16) *QuestionSection {
-	binary.BigEndian.PutUint16(q.Class, class)
+	q.Class = class
 	return q
 }
 
@@ -165,28 +169,24 @@ func (q *QuestionSection) AddName(domain string) *QuestionSection {
 func (q *QuestionSection) ToBytes() []byte {
 	result := make([]byte, 0)
 	result = append(result, q.Name...)
-	result = append(result, q.Type...)
-	result = append(result, q.Class...)
+	result = binary.BigEndian.AppendUint16(result, q.Type)
+	result = binary.BigEndian.AppendUint16(result, q.Class)
 	return result
 }
 
 type AnswerSection struct {
 	Name   []byte // Label Sequence	The domain name encoded as a sequence of labels.
-	Type   []byte // 2-byte Integer	1 for an A record, 5 for a CNAME record etc., full list here
-	Class  []byte // 2-byte Integer	Usually set to 1 (full list here)
-	TTL    []byte // 4-byte Integer	The duration in seconds a record can be cached before requerying.
-	Length []byte // 2-byte Integer	Length of the RDATA field in bytes.
+	Type   uint16 // 2-byte Integer	1 for an A record, 5 for a CNAME record etc., full list here
+	Class  uint16 // 2-byte Integer	Usually set to 1 (full list here)
+	TTL    uint32 // 4-byte Integer	The duration in seconds a record can be cached before requerying.
+	Length uint16 // 2-byte Integer	Length of the RDATA field in bytes.
 	Data   []byte // Variable	Data specific to the record type.
 }
 
 func NewAnswerSection() AnswerSection {
 	return AnswerSection{
-		Name:   make([]byte, 0),
-		Type:   make([]byte, 2),
-		Class:  make([]byte, 2),
-		TTL:    make([]byte, 4),
-		Length: make([]byte, 2),
-		Data:   make([]byte, 0),
+		Name: make([]byte, 0),
+		Data: make([]byte, 0),
 	}
 }
 
@@ -196,53 +196,44 @@ func (a *AnswerSection) AddName(domain string) *AnswerSection {
 }
 
 func (a *AnswerSection) AddType(typ uint16) *AnswerSection {
-	binary.BigEndian.PutUint16(a.Type, typ)
+	a.Type = typ
 	return a
 }
 
 func (a *AnswerSection) AddClass(class uint16) *AnswerSection {
-	binary.BigEndian.PutUint16(a.Class, class)
+	a.Class = class
 	return a
 }
 
 func (a *AnswerSection) AddTTL(ttl uint32) *AnswerSection {
-	binary.BigEndian.PutUint32(a.TTL, ttl)
+	a.TTL = ttl
 	return a
 }
 
 func (a *AnswerSection) AddLength(length uint16) *AnswerSection {
-	binary.BigEndian.PutUint16(a.Length, length)
+	a.Length = length
 	return a
 }
 
 func (a *AnswerSection) AddData(data string) *AnswerSection {
-	ip := make([]byte, 0)
-	ipArray := strings.Split(data, ".")
-
-	for _, val := range ipArray {
-		num, err := strconv.ParseUint(val, 10, 8)
-		if err != nil {
-			fmt.Println(err)
-		}
-		ip = append(ip, byte(num))
-	}
-	a.Data = ip
+	a.Data = EncodeDomain(data)
 	return a
 }
 
 func (a *AnswerSection) ToBytes() []byte {
 	result := make([]byte, 0)
 	result = append(result, a.Name...)
-	result = append(result, a.Type...)
-	result = append(result, a.Class...)
-	result = append(result, a.TTL...)
-	result = append(result, a.Length...)
+	result = binary.BigEndian.AppendUint16(result, a.Type)
+	result = binary.BigEndian.AppendUint16(result, a.Class)
+	result = binary.BigEndian.AppendUint32(result, a.TTL)
+	result = binary.BigEndian.AppendUint16(result, a.Length)
 	result = append(result, a.Data...)
 
 	return result
 }
 
-func DeserializeHeader(header []byte) HeaderSection {
+func DeserializeHeader(buf []byte) (HeaderSection, int) {
+	header := buf[:12]
 	var packetId uint16
 	var qdCount uint16
 	var anCount uint16
@@ -268,5 +259,95 @@ func DeserializeHeader(header []byte) HeaderSection {
 		AnCount:  anCount,
 		NsCount:  nsCount,
 		ArCount:  arCount,
+	}, 12
+}
+
+func DeserializeQuestionSection(data []byte) (QuestionSection, int) {
+	name, endIdx := DecodeLabelSequence(data)
+	var typ uint16
+	var class uint16
+
+	if endIdx >= len(data) {
+		return QuestionSection{}, 0
 	}
+
+	endIdx++
+	binary.Read(bytes.NewBuffer(data[endIdx:endIdx+2]), binary.BigEndian, &typ)
+	binary.Read(bytes.NewBuffer(data[endIdx+2:endIdx+4]), binary.BigEndian, &class)
+
+	q := QuestionSection{
+		Name:  name,
+		Type:  typ,
+		Class: class,
+	}
+	return q, len(q.ToBytes())
+}
+
+func DeserializeAnswerSection(data []byte) AnswerSection {
+	var typ uint16
+	var class uint16
+	var ttl uint32
+	var length uint16
+	name, endIdx := DecodeLabelSequence(data)
+	if endIdx >= len(data) {
+		return AnswerSection{}
+	}
+	endIdx++
+	binary.Read(bytes.NewBuffer(data[endIdx:endIdx+2]), binary.BigEndian, &typ)
+	binary.Read(bytes.NewBuffer(data[endIdx+2:endIdx+4]), binary.BigEndian, &class)
+	binary.Read(bytes.NewBuffer(data[endIdx+4:endIdx+8]), binary.BigEndian, &ttl)
+	binary.Read(bytes.NewBuffer(data[endIdx+8:endIdx+10]), binary.BigEndian, &length)
+	domain := DecodeDomain(data[endIdx+10 : endIdx+14])
+	fmt.Println(domain)
+	return AnswerSection{
+		Name:   name,
+		Type:   typ,
+		Class:  class,
+		TTL:    ttl,
+		Length: length,
+		Data:   []byte(domain),
+	}
+}
+
+func DecodeLabelSequence(data []byte) ([]byte, int) {
+	curr := 0
+	var name []byte
+	for {
+		if data[curr] == 0 || curr >= len(data) {
+			break
+		}
+
+		length := data[curr]
+		curr++
+		var word []byte
+		for i := 0; i < int(length); i++ {
+			word = append(word, data[curr])
+			curr++
+		}
+		name = append(name, word...)
+		name = append(name, '.')
+	}
+	//removed the trailing .
+	return name[:len(name)-1], curr
+}
+
+func EncodeDomain(data string) []byte {
+	ip := make([]byte, 0)
+	ipArray := strings.Split(data, ".")
+
+	for _, val := range ipArray {
+		num, err := strconv.ParseUint(val, 10, 8)
+		if err != nil {
+			fmt.Println(err)
+		}
+		ip = append(ip, byte(num))
+	}
+	return ip
+}
+
+// Todo. Incomplete
+func DecodeDomain(buf []byte) string {
+	var value uint32
+	binary.Read(bytes.NewBuffer(buf), binary.BigEndian, &value)
+	return fmt.Sprint(value)
 }
