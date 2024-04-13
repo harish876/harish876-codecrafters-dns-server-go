@@ -14,7 +14,7 @@ func main() {
 		fmt.Println("Failed to resolve UDP address:", err)
 		return
 	}
-
+	count := 0
 	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		fmt.Println("Failed to bind to address:", err)
@@ -33,30 +33,40 @@ func main() {
 		}
 
 		receivedData := string(buf[:size])
-		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
+		count++
+		_ = receivedData
+		fmt.Printf("Received %d bytes from %s for count %d\n", size, source, count)
 
-		reqHeader, offset1 := parser.DeserializeHeader(buf[:12])
-		reqQuestion, _ := parser.DeserializeQuestionSection(buf[offset1:])
+		reqHeader, offset := parser.DeserializeHeader(buf[:12])
 
-		q := parser.NewQuestionSection()
-		q.AddName(string(reqQuestion.Name)).AddType(1).AddClass(1)
+		fmt.Printf("Number Of Questions : %d\n", reqHeader.QdCount)
+		var questions []parser.QuestionSection
+		for i := 0; i < int(reqHeader.QdCount); i++ {
+			reqQuestion, _ := parser.DeserializeQuestionSection(buf[offset:])
+			questions = append(questions, reqQuestion)
+		}
+		var answers []parser.AnswerSection
+		for _, question := range questions {
+			answer := parser.Answer(question)
+			answers = append(answers, answer)
+		}
 
-		a := parser.NewAnswerSection()
-		a.AddName(string(reqQuestion.Name)).AddType(1).AddClass(1).AddTTL(60).AddLength(4).AddData("8.8.8.8")
-
-		reqHeader.AddQR(1).AddAnCount(1).AddRcode(4)
-		fmt.Println("Request RCode", reqHeader.Rcode)
+		reqHeader.AddQR(1).AddAnCount(uint16(len(answers))).AddRcode(4)
 		header := reqHeader.ToBytes()
-		question := q.ToBytes()
-		answer := a.ToBytes()
 
 		response := []byte{}
 		response = append(response, header...)
-		response = append(response, question...)
-		response = append(response, answer...)
+		for _, question := range questions {
+			q := parser.NewQuestionSection()
+			q.AddName(string(question.Name)).AddType(1).AddClass(1)
+			response = append(response, q.ToBytes()...)
+		}
+		for _, answer := range answers {
+			response = append(response, answer.ToBytes()...)
+		}
 
 		sentByteCount, err := udpConn.WriteToUDP(response, source)
-		fmt.Println("Byte Count:", sentByteCount)
+		_ = sentByteCount
 		if err != nil {
 			fmt.Println("Failed to send response:", err)
 		}

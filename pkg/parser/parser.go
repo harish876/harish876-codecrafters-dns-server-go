@@ -351,3 +351,9 @@ func DecodeDomain(buf []byte) string {
 	binary.Read(bytes.NewBuffer(buf), binary.BigEndian, &value)
 	return fmt.Sprint(value)
 }
+
+func Answer(q QuestionSection) AnswerSection {
+	a := NewAnswerSection()
+	a.AddName(string(q.Name)).AddType(1).AddClass(1).AddTTL(60).AddLength(4).AddData("8.8.8.8")
+	return a
+}

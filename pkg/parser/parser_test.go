@@ -58,3 +58,19 @@ func TestDeserializeAnswerSection(t *testing.T) {
 	fmt.Println("Deserialised Answer Section Length - ", da.Length)
 	fmt.Println("Deserialised Answer Section Data - ", da.Data)
 }
+
+func TestCompressedQuestion(t *testing.T) {
+	input := []byte{12, 99, 111, 100, 101, 99, 114, 97, 102, 116, 101, 114, 115, 2, 105, 111, 0, 0, 1, 0, 1}
+	ques, _ := DeserializeQuestionSection(input)
+	fmt.Println("\nQuesting Name: ", string(ques.Name))
+	fmt.Println("Questing Type: ", ques.Type)
+	fmt.Println("Questing Class: ", ques.Class)
+}
+
+func TestUncompressedQuestion(t *testing.T) {
+	input := []byte{3, 97, 98, 99, 17, 108, 111, 110, 103, 97, 115, 115, 100, 111, 109, 97, 105, 110, 110, 97, 109, 101, 3, 99, 111, 109, 0, 0, 1, 0, 1, 3, 100, 101, 102, 192, 16, 0, 1, 0, 1}
+	ques, _ := DeserializeQuestionSection(input)
+	fmt.Println("\nQuesting Name: ", string(ques.Name))
+	fmt.Println("Questing Type: ", ques.Type)
+	fmt.Println("Questing Class: ", ques.Class)
+}
